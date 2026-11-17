@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using CardShopCoop.Api;
 using HarmonyLib;
 
 namespace CardShopCoop.Modules.Pricing
