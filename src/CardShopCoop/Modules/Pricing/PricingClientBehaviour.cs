@@ -150,8 +150,15 @@ namespace CardShopCoop.Modules.Pricing
             {
                 for (var i = 0; i < state.ItemTypes.Count; i++)
                 {
-                    CPlayerData.SetItemPrice(state.ItemTypes[i], state.ItemPrices[i]);
-                    PricingDisplay.SetItem(state.ItemTypes[i], state.ItemPrices[i]);
+                    // An older host may still ship EPL alias ids (e.g. EItemType.Max).
+                    var type = PricingInterop.Canonical(state.ItemTypes[i]);
+                    if (!PricingInterop.IsItemTypeValid(type))
+                    {
+                        continue;
+                    }
+
+                    CPlayerData.SetItemPrice(type, state.ItemPrices[i]);
+                    PricingDisplay.SetItem(type, state.ItemPrices[i]);
                 }
 
 
@@ -215,11 +222,17 @@ namespace CardShopCoop.Modules.Pricing
 
         private bool ApplyItemDelta(PricingItemDeltaEntry entry)
         {
+            var type = PricingInterop.Canonical(entry.ItemType);
+            if (!PricingInterop.IsItemTypeValid(type))
+            {
+                return true; // unusable id (alias from an older host): consume, never apply
+            }
+
             _applying = true;
             try
             {
-                CPlayerData.SetItemPrice(entry.ItemType, entry.Price);
-                PricingDisplay.SetItem(entry.ItemType, entry.Price);
+                CPlayerData.SetItemPrice(type, entry.Price);
+                PricingDisplay.SetItem(type, entry.Price);
             }
             finally
             {
@@ -271,6 +284,7 @@ namespace CardShopCoop.Modules.Pricing
         /// (a remote/replay apply, an invalid slot, or no active client).</summary>
         internal static float CaptureItemBefore(EItemType type)
         {
+            type = PricingInterop.Canonical(type);
             var active = _active;
             if (active == null || active._applying || !PricingInterop.IsItemTypeValid(type))
             {
@@ -287,6 +301,10 @@ namespace CardShopCoop.Modules.Pricing
         /// previous value through the game's own setter.</summary>
         internal static void ObserveItemSetter(EItemType type, float price, float previous)
         {
+            // Same product, same key as the host: a write through EPL's alias band must be
+            // forwarded as the minted id, or the host stores and re-broadcasts it under a
+            // second key for the same product.
+            type = PricingInterop.Canonical(type);
             var active = _active;
             if (active == null || active._applying || float.IsNaN(previous)
                 || !active.CanSend() || !PricingInterop.IsItemTypeValid(type)

@@ -11,6 +11,29 @@ namespace CardShopCoop.Modules.Pricing
 
         internal const float PriceEpsilon = 0.0075f;
 
+        /// <summary>First value EPL's prepatcher mints into EItemType (EnumPatcher's
+        /// startingValue).</summary>
+        internal const int EplMintFloor = 200000;
+
+        /// <summary>The one stable id for a product. A price written through EPL's alternate index
+        /// band (e.g. by a mod that loops the enum and hits <see cref="EItemType.Max"/>) lands on
+        /// a real modded product locally, but keying it by the alias splits that product across
+        /// two ids in the display mirror and on the wire, and the alias names a different product
+        /// on a machine whose mod order differs. Every pricing entry point canonicalizes first;
+        /// an alias that cannot be resolved becomes <see cref="EItemType.None"/> (dropped).</summary>
+        internal static EItemType Canonical(EItemType type)
+        {
+            var value = (int)type;
+            if (value < (int)EItemType.Max || value >= EplMintFloor)
+            {
+                return type;
+            }
+
+            return global::CardShopCoop.Modules.World.WorldMarketInteraction.TryResolveEplItemAlias(value, out var resolved)
+                ? resolved
+                : EItemType.None;
+        }
+
         /// <summary>A wireable EItemType with a live price store. The raw list is indexed
         /// directly by <c>(int)type</c> only below EPL's weave boundary
         /// (<see cref="EItemType.Max"/>); EPL serves every minted id at or above that boundary
@@ -21,6 +44,15 @@ namespace CardShopCoop.Modules.Pricing
         internal static bool IsItemTypeValid(EItemType type)
         {
             if (type == EItemType.None)
+            {
+                return false;
+            }
+
+            // [Max, 200000) is never a product id: Max is the sentinel and, with EPL, the whole
+            // band is its alternate index space, ordered by the LOCAL mod set. Callers that may
+            // hold such a value (game setters, other mods) must pass it through Canonical first.
+            var value = (int)type;
+            if (value >= (int)EItemType.Max && value < EplMintFloor)
             {
                 return false;
             }

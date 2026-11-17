@@ -128,21 +128,24 @@ namespace CardShopCoop.Modules.Pricing
                 return ActionOutcome.Reject("pricing session is not active");
             }
 
-            if (!PricingInterop.IsItemTypeValid(message.ItemType)
+            // An older client may still send EPL alias ids. Resolving one here would use THIS
+            // machine's mod order, not the sender's, so IsItemTypeValid refuses it instead.
+            var itemType = message.ItemType;
+            if (!PricingInterop.IsItemTypeValid(itemType)
                 || !PricingInterop.ValidPrice(message.Price))
             {
                 return RejectItem(message, "item price is invalid");
             }
 
-            if (!TrySetItem(message.ItemType, message.Price, out var actual))
+            if (!TrySetItem(itemType, message.Price, out var actual))
             {
                 return RejectItem(message, "the item price could not be set");
             }
 
-            QueueItemDelta(message.ItemType, actual);
+            QueueItemDelta(itemType, actual);
             return ActionOutcome.Applied(new PricingItemResponse
             {
-                ItemType = message.ItemType,
+                ItemType = itemType,
                 Price = actual,
             });
         }
@@ -282,6 +285,9 @@ namespace CardShopCoop.Modules.Pricing
 
         private void CaptureItemSetterLocal(EItemType type, float requestedPrice)
         {
+            // Key the product by its minted id even when the setter was reached through EPL's
+            // alias band (a mod looping the enum reaches EItemType.Max on every day-start pass).
+            type = PricingInterop.Canonical(type);
             if (_shutdown || _applying || !PricingInterop.IsItemTypeValid(type)
                 || !PricingInterop.ValidPrice(requestedPrice))
             {

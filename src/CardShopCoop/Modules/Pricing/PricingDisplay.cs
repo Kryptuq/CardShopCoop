@@ -17,6 +17,7 @@ namespace CardShopCoop.Modules.Pricing
 
         internal static void SetItem(EItemType type, float price)
         {
+            type = PricingInterop.Canonical(type);
             if (!PricingInterop.IsItemTypeValid(type) || !PricingInterop.ValidPrice(price))
             {
                 return;
@@ -64,6 +65,7 @@ namespace CardShopCoop.Modules.Pricing
 
         internal static float ReadItem(EItemType type)
         {
+            type = PricingInterop.Canonical(type);
             if (!PricingInterop.IsItemTypeValid(type))
             {
                 return 0f;

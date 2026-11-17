@@ -899,6 +899,34 @@ namespace CardShopCoop.Modules.World
         private static PropertyInfo s_eplAssetsProp, s_eplItemLibProp, s_eplItemDataProp;
         private static PropertyInfo s_eplGenMarket, s_eplGenCost, s_eplPctChange, s_eplAvgCost;
 
+        /// <summary>Maps an id in EPL's alternate index band [130, 200000) to the minted EItemType
+        /// it stands for on THIS machine. That band is ordered by the locally installed mod set,
+        /// so an alias must never be keyed, cached or put on the wire - only the minted id it
+        /// resolves to is stable across machines. Returns false when EPL is absent or the alias
+        /// does not resolve to a minted id.</summary>
+        internal static bool TryResolveEplItemAlias(int value, out EItemType resolved)
+        {
+            resolved = EItemType.None;
+            if (value < EplWeaveBoundary || value >= 200000 || !EplMarketBridge()
+                || s_eplResolve == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                resolved = (EItemType)s_eplResolve.Invoke(null, new object[] { value });
+            }
+            catch (Exception e)
+            {
+                CoopLog.Swallow(e);
+                resolved = EItemType.None;
+                return false;
+            }
+
+            return (int)resolved >= 200000;
+        }
+
         private static bool EplMarketBridge()
         {
             if (s_eplTryGet != null && s_eplSaveMgr != null)

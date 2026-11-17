@@ -93,7 +93,7 @@ namespace CardShopCoop.Modules.Pricing
             }
             else
             {
-                var type = tag.GetItemType();
+                var type = PricingInterop.Canonical(tag.GetItemType());
                 if (type != EItemType.None)
                 {
                     entry.Item = type;
@@ -138,6 +138,7 @@ namespace CardShopCoop.Modules.Pricing
 
         internal static void RefreshItem(EItemType type)
         {
+            type = PricingInterop.Canonical(type);
             if (!ByItem.TryGetValue(type, out var tags))
             {
                 return;
