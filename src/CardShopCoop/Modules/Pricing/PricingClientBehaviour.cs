@@ -176,6 +176,7 @@ namespace CardShopCoop.Modules.Pricing
                 _applying = false;
             }
 
+            PricingTrace.Baseline("client-baseline", state.ItemTypes, state.ItemPrices);
             // The baseline is the full owned-card set; a tag whose card is no longer in it must
             // fall back to the game's store instead of keeping an earlier override.
             PriceTagRegistry.RefreshAll();
@@ -228,6 +229,9 @@ namespace CardShopCoop.Modules.Pricing
                 return true; // unusable id (alias from an older host): consume, never apply
             }
 
+            PricingTrace.Item("client-host-delta", type, "price=" + PricingTrace.F(entry.Price)
+                + " storeBefore=" + PricingTrace.F(PricingInterop.ReadItem(type))
+                + " mirrorBefore=" + PricingTrace.F(PricingDisplay.ReadItem(type)));
             _applying = true;
             try
             {
@@ -310,10 +314,20 @@ namespace CardShopCoop.Modules.Pricing
                 || !active.CanSend() || !PricingInterop.IsItemTypeValid(type)
                 || !PricingInterop.ValidPrice(price))
             {
+                if (active == null || !active._applying)
+                {
+                    PricingTrace.Item("client-local-set", type, "previous=" + PricingTrace.F(previous)
+                        + " price=" + PricingTrace.F(price) + " NOT forwarded (active="
+                        + (active != null) + " canSend=" + (active != null && active.CanSend())
+                        + " validPrice=" + PricingInterop.ValidPrice(price) + ")", true);
+                }
+
                 return;
             }
 
 
+            PricingTrace.Item("client-local-set", type, "previous=" + PricingTrace.F(previous)
+                + " price=" + PricingTrace.F(price) + " -> intent to host", true);
             active.PredictItem(type, price, previous);
         }
 
@@ -421,6 +435,8 @@ namespace CardShopCoop.Modules.Pricing
                 return;
             }
 
+            PricingTrace.Item("client-intent-rejected", message.ItemType, "restoring previous="
+                + PricingTrace.F(message.Previous));
             ApplyLocalItem(message.ItemType, message.Previous);
         }
 
@@ -432,6 +448,8 @@ namespace CardShopCoop.Modules.Pricing
                 return;
             }
 
+            PricingTrace.Item("client-intent-merged", message.ItemType, "hostPrice=" + PricingTrace.F(answer.Price)
+                + " mirror=" + PricingTrace.F(PricingDisplay.ReadItem(message.ItemType)));
             ApplyLocalItem(message.ItemType, answer.Price);
         }
 

@@ -194,6 +194,7 @@ namespace CardShopCoop.Modules.Pricing
             harmony.CreateClassProcessor(typeof(PriceTagInitCard)).Patch();
             harmony.CreateClassProcessor(typeof(PriceTagItemImage)).Patch();
             harmony.CreateClassProcessor(typeof(PriceTagCardData)).Patch();
+            PricingTracePatches.Apply(harmony); // DIAGNOSTIC ONLY
         }
 
         [HarmonyPatch(typeof(UI_PriceTag), "OnEnable")]

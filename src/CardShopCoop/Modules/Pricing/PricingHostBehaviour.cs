@@ -131,6 +131,9 @@ namespace CardShopCoop.Modules.Pricing
             // An older client may still send EPL alias ids. Resolving one here would use THIS
             // machine's mod order, not the sender's, so IsItemTypeValid refuses it instead.
             var itemType = message.ItemType;
+            PricingTrace.Item("host-client-intent", itemType, "price=" + PricingTrace.F(message.Price)
+                + " clientPrevious=" + PricingTrace.F(message.Previous)
+                + " hostBefore=" + PricingTrace.F(PricingInterop.ReadItem(itemType)));
             if (!PricingInterop.IsItemTypeValid(itemType)
                 || !PricingInterop.ValidPrice(message.Price))
             {
@@ -142,6 +145,7 @@ namespace CardShopCoop.Modules.Pricing
                 return RejectItem(message, "the item price could not be set");
             }
 
+            PricingTrace.Item("host-client-intent-applied", itemType, "stored=" + PricingTrace.F(actual));
             QueueItemDelta(itemType, actual);
             return ActionOutcome.Applied(new PricingItemResponse
             {
@@ -296,6 +300,8 @@ namespace CardShopCoop.Modules.Pricing
 
 
             var actual = PricingInterop.ReadItem(type);
+            PricingTrace.Item("host-local-set", type, "requested=" + PricingTrace.F(requestedPrice)
+                + " stored=" + PricingTrace.F(actual) + " -> broadcast", true);
             PricingDisplay.SetItem(type, actual);
             QueueItemDelta(type, actual);
         }
@@ -405,6 +411,7 @@ namespace CardShopCoop.Modules.Pricing
                 PricingDisplay.SetItem(type, price);
             }
 
+            PricingTrace.Baseline("host-baseline", state.ItemTypes, state.ItemPrices);
             var keys = new List<string>(_cards.Keys);
             keys.Sort(StringComparer.Ordinal);
             for (var i = 0; i < keys.Count; i++)
