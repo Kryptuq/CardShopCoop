@@ -495,7 +495,7 @@ namespace CardShopCoop.Modules.World
         private static void FillPercents(List<MarketPercentEntry> out_list, List<float> list, List<int> modded)
         {
             var vanilla = VanillaWalkCount(list);
-            var moddedVals = CollectModded(modded, s_eplPctChange);
+            var moddedVals = CollectModded(modded, s_eplPctChange, false); // client zeroes every modded percent first
             for (var i = 0; i < vanilla; i++)
             {
                 if (list[i] != 0f)
@@ -521,12 +521,19 @@ namespace CardShopCoop.Modules.World
         }
 
         // Generated base prices are FULL floats keyed by raw itemType (the >= 200k
-        // modded id space), non-zero entries only. Unlike percents, absent entries keep
-        // their local value - the host may legitimately have gaps we filled at join.
+        // modded id space). Vanilla rows ship non-zero only and an absent vanilla row keeps
+        // its local value - the host may legitimately have gaps we filled at join.
+        //
+        // Modded rows ship EVERY row the host has, zero included. A client's EPL item rows
+        // arrive in the transferred mod-data sidecar, which is keyed by the HOST's minted ids;
+        // EPL mints in a different order per machine, so on the client each row sits under a
+        // different product. A zero the host omits would leave that foreign row in place (the
+        // DraX Scarlet & Violet booster showed another product's $38 market price on the
+        // client while the host's own row was $0 and priced off the base value).
         private static void FillSparse(List<MarketSparseEntry> out_list, List<float> list, List<int> modded, PropertyInfo eplField)
         {
             var vanilla = VanillaWalkCount(list);
-            var moddedVals = CollectModded(modded, eplField);
+            var moddedVals = CollectModded(modded, eplField, true);
             for (var i = 0; i < vanilla; i++)
             {
                 if (list[i] != 0f)
@@ -1175,26 +1182,33 @@ namespace CardShopCoop.Modules.World
             return null;
         }
 
-        private static float EplGetFloat(int itemType, PropertyInfo field)
+        /// <summary>Reads one float field of an item's EPL save row. False when the item has no
+        /// row, so "no row" is never confused with a row whose value is 0.</summary>
+        private static bool TryEplGetFloat(int itemType, PropertyInfo field, out float value)
         {
+            value = 0f;
             if (field == null)
             {
-                return 0f;
+                return false;
             }
 
             try
             {
                 var d = EplSaveData(itemType);
-                if (d != null)
+                if (d == null)
                 {
-                    var v = field.GetValue(d, null);
-                    return v != null ? Convert.ToSingle(v) : 0f;
+                    return false;
                 }
+
+                var v = field.GetValue(d, null);
+                value = v != null ? Convert.ToSingle(v) : 0f;
+                return true;
             }
-            catch
+            catch (Exception e)
             {
+                CoopLog.Swallow(e);
+                return false;
             }
-            return 0f;
         }
 
         private static void EplSetFloat(int itemType, PropertyInfo field, float value)
@@ -1217,7 +1231,10 @@ namespace CardShopCoop.Modules.World
             }
         }
 
-        private static List<KeyValuePair<int, float>> CollectModded(List<int> modded, PropertyInfo field)
+        /// <param name="includeZero">Ship a row whose value is 0 too. A row the host has no
+        /// save data for is never shipped either way.</param>
+        private static List<KeyValuePair<int, float>> CollectModded(List<int> modded, PropertyInfo field,
+            bool includeZero)
         {
             var vals = new List<KeyValuePair<int, float>>();
             if (field != null && modded != null)
@@ -1226,8 +1243,12 @@ namespace CardShopCoop.Modules.World
                 {
                     try
                     {
-                        var v = EplGetFloat(modded[k], field);
-                        if (v != 0f)
+                        if (!TryEplGetFloat(modded[k], field, out var v))
+                        {
+                            continue;
+                        }
+
+                        if (includeZero || v != 0f)
                         {
                             vals.Add(new KeyValuePair<int, float>(modded[k], v));
                         }
