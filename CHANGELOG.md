@@ -1,5 +1,11 @@
 # CardShopCoopCommunity — Changelog
 
+## 2.3.2
+
+- Fixed: One modded product (seen with the Scarlet & Violet Base Set Booster Pack from DraX's Pokémon add-on) showing a completely different market price for the second player. With Auto Set Prices installed, that wrong market price ended up as the shelf price for both players every new day.
+- Fixed: Mods that set prices for every item at once (like Auto Set Prices) could save a modded product's price twice under two different IDs.
+- Both players need to update to 2.3.2 together.
+
 ## 2.3.1
 
 - Removed a redundant `Assembly.Load` call at startup.
